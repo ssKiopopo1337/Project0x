@@ -1,0 +1,1921 @@
+CS2 · сборка neverwin · Lua API
+
+Neverlose Lua API
+документация сборки
+Полный справочник Lua-интерфейса сборки: события, отрисовка, меню, игровые объекты, трассировки, частицы, ESP и insecure-модули. Каждая функция — с сигнатурой, описанием аргументов и рабочим примером.
+
+LuaJIT 2.1 / Lua 5.1
+песочница без io и debug
+20 разделов
+примеры на каждую тему
+Быстрый старт
+GitHub
+первый скрипт — Extensions → +
+lua
+Копировать
+print("Hello from Neverlose Lua!")
+
+events.on("paint", function()
+    render.text(24, 90, color(255, 255, 255), "Hello, Lua!")
+end)
+Вставь в редактор Extensions, нажми Save & Reload — и увидишь текст на экране.
+
+Как читать справочник
+
+x?
+аргумент необязательный
+(?)
+назначение аргумента или возвращаемого значения установлено не полностью
+@0x…
+адрес из исходного бинарника спецификации — для исследования, не стабильный адрес сборки
+wl.*
+реальные внутренние имена типов (wl.entity, wl.ui, wl.cmd…) — переименовывать их не нужно
+Основа справочника — восстановленная спецификация, переданная владельцем проекта; подписи и ограничения сохранены как есть. В скриптах используются Lua-имена функций, а не адреса. Совместимость каждого метода с каждой сборкой не проверялась. Нашёл неточность — открой Issue с минимальным примером и номером сборки.
+
+01
+Быстрый старт
+От создания файла до первого текста на экране — пять минут. Всё, что нужно, уже есть в клиенте: редактор скриптов живёт во вкладке Extensions.
+
+#
+Создание и загрузка скрипта
+1
+Открой вкладку Extensions в меню клиента.
+2
+Нажми +, укажи имя скрипта и вставь Lua-код.
+3
+Нажми Save, чтобы просто сохранить, или Save & Reload, чтобы сохранить и сразу загрузить. У уже существующего скрипта редактор открывается кнопкой ….
+4
+Список скриптов обновляется кнопкой Refresh; кнопки загрузки и остановки находятся рядом с каждым скриптом.
+Готовый скрипт с диска
+
+Скопируй нужный .lua в C:\neverwin\scripts и нажми Refresh в Extensions — файл появится в списке. Путь neverwin — действующий каталог текущей сборки, он не переименовывался.
+
+#
+Минимальный пример
+hello.lua
+lua
+Копировать
+print("Script loaded")
+
+events.on("paint", function()
+    render.text(24, 90, color(255, 255, 255), "Hello, Lua!")
+end)
+print пишет в вывод Lua и срабатывает при загрузке скрипта. Обработчик paint вызывается каждый кадр отрисовки — именно внутри него разрешены все функции render.*. Цвет собирается конструктором color(r, g, b, a), каналы — от 0 до 255.
+
+#
+Первый элемент меню
+overlay.lua
+lua
+Копировать
+local tab = ui.tab("Lua Examples")
+local group = tab:group("Overlay")
+local enabled = group:checkbox("Show example", true)
+
+events.on("paint", function()
+    if not enabled:get() then
+        return
+    end
+
+    render.text(24, 90, color(255, 255, 255), "Enabled")
+end)
+Скрипт создаёт собственную вкладку Lua Examples с чекбоксом. Ссылка на элемент хранится в enabled, а :get() возвращает его текущее значение. Все элементы и их методы — в разделе Меню · ui.
+
+#
+Файлы и ресурсы
+Путь	Назначение
+C:\neverwin\scripts	Основные файлы .lua
+C:\neverwin\scripts\images	Изображения и SVG (render.load_image, render.load_svg)
+C:\neverwin\scripts\fonts	Пользовательские шрифты (render.font), плюс Windows\Fonts
+C:\neverwin\scripts\particles	Ресурсы частиц (particle.override)
+C:\neverwin\scripts\data	Данные файлового API file.*
+C:\neverwin\scripts\data\db	JSON-хранилища db.*
+Заметка
+
+Встроенный редактор работает с UTF-8 и файлами до 256 КиБ. При сохранении через редактор полный путь к файлу вводить не нужно.
+
+#
+Контексты и типичные ошибки
+Рисование (render.*) — только внутри paint.
+Объект wl.cmd трогай только в своём createmove, wl.view — в override_view, wl.event — в своём обработчике события.
+Трассировки trace.* и engine.simulate работают в createmove, frame_stage и колбэках игровых событий.
+Запись памяти, ffi, http, file и часть методов требуют включённый Allow Insecure. Примеры из репозитория этот режим не используют.
+Если скрипт не загружается — смотри текст ошибки в выводе Lua, проверь кодировку файла, имена функций и контекст вызова. Для отчёта о проблеме достаточно минимального кода и номера сборки.
+
+02
+Готовые примеры
+Три минимальных скрипта из папки examples репозитория. Они не требуют Allow Insecure; запуск в игре авторами ещё не проверялся, но используют только задокументированные функции.
+
+#
+01 · Hello World — сообщения при загрузке и выгрузке
+01_hello_world.lua
+lua
+Копировать
+-- @author Example
+-- @uid 1
+-- Prints load/unload messages. Does not require Allow Insecure.
+
+print("Hello from Neverlose Lua!")
+
+events.on("unload", function()
+    print("Hello World unloaded")
+end)
+print при загрузке подтверждает, что скрипт поднялся. Подписка на unload позволяет корректно «прибраться» перед выгрузкой — снять таймеры, закрыть сокеты, вывести прощальное сообщение.
+
+#
+02 · Оверлей — флажок в меню и плашка на экране
+02_overlay.lua
+lua
+Копировать
+-- @author Example
+-- @uid 1
+-- A checkbox and a small overlay. Does not require Allow Insecure.
+
+local tab = ui.tab("Lua Examples")
+local group = tab:group("Overlay")
+local enabled = group:checkbox("Show example", true)
+local tint = color(220, 230, 255, 255)
+
+events.on("paint", function()
+    if not enabled:get() then
+        return
+    end
+
+    render.rect_filled(20, 80, 190, 35, color(15, 18, 25, 210), 6)
+    render.text(30, 90, tint, "Neverlose Lua example")
+end)
+Классический каркас любого оверлея: элемент меню управляет видимостью, а paint рисует подложку rect_filled (последний аргумент 6 — скругление углов) и текст поверх неё. Ранний return из колбэка — дешёвый способ выключить отрисовку.
+
+#
+03 · События меню — лог открытия и закрытия
+03_menu_events.lua
+lua
+Копировать
+-- @author Example
+-- @uid 1
+-- Read-only menu event logging. Does not require Allow Insecure.
+
+events.on("menu_toggled", function(open)
+    print(open and "Menu opened" or "Menu closed")
+end)
+Событие menu_toggled передаёт true при открытии меню и false при закрытии. Удобно для паузы тяжёлой отрисовки, переключения режимов курсора или отладки.
+
+03
+Окружение и песочница
+Скрипты выполняются на LuaJIT 2.1 (совместимость с Lua 5.1) внутри песочницы: часть стандартных библиотек вырезана, загрузка файлов и сети доступны только в insecure-режиме.
+
+#
+Что доступно из стандартной библиотеки
+Модуль	Статус в песочнице
+_G, table, string, math, bit, jit	доступны полностью
+os	урезан: os.clock() (= globals.realtime), os.time(), os.date()
+print(...)	пишет в вывод Lua через tostring
+load, loadstring	заменены собственной реализацией клиента
+require	своя реализация, кэш модулей в REGISTRY.wl_modules
+ffi	доступен только при включённом Allow Insecure
+io, debug, package	не загружаются
+dofile, loadfile	равны nil
+#
+Папки на диске
+Каталог	Кто использует
+scripts\images	render.load_image, render.load_svg
+scripts\fonts (+ Windows\Fonts)	render.font
+scripts\particles	particle.override
+scripts\data	file.*
+scripts\data\db	db.* (JSON-файлы)
+Все пути — относительно C:\neverwin\.
+
+#
+Контексты вызова функций
+Некоторые группы функций работают только внутри определённых колбэков. Вызов в другом месте бросает ошибку — это защита движка, а не баг скрипта.
+
+Функции	Разрешённый контекст
+render.* (рисование)	только внутри paint, иначе ошибка «render.* draws only inside a paint callback»
+trace.*, engine.simulate	только в createmove, frame_stage и колбэках игровых событий
+wl.cmd	только внутри своего createmove
+wl.view	только внутри override_view
+wl.event	только внутри своего колбэка события
+правильный контекст для trace
+lua
+Копировать
+-- trace.line НЕЛЬЗЯ вызывать в paint — только createmove
+local last_visible = {}
+
+events.on("createmove", function(cmd)
+    local me = entity.local_pawn()
+    if not me or not me:alive() then return end
+
+    for _, e in ipairs(entity.players()) do
+        local pawn = e.pawn
+        if pawn and pawn:is_enemy() and pawn:alive() then
+            local tr = trace.line(me:eye_position(), pawn:bone(6), me)
+            last_visible[pawn:steam_id()] = tr.hit and tr.entity == pawn
+        end
+    end
+end)
+
+-- а в paint можно только рисовать уже посчитанное
+events.on("paint", function()
+    local y = 120
+    for sid, vis in pairs(last_visible) do
+        render.text(24, y, vis and color(120, 255, 170) or color(255, 120, 110),
+            sid .. (vis and " — виден" or " — за стеной"))
+        y = y + 18
+    end
+end)
+Паттерн «посчитай и нарисуй»
+
+Тяжёлые проверки (видимость, урон, трассировки) делай в createmove и складывай результат в таблицу, а paint пусть только рисует. Так скрипт не упирается в контекстные ограничения и не тормозит кадр.
+
+04
+События — events
+Вся жизнь скрипта строится на подписках: клиент вызывает твои функции в нужные моменты — на отрисовке, на команде движения, на игровых событиях CS2.
+
+events.on(name, fn)
+events.on(name: string, fn: function) -> integer   -- id подписки
+Подписывает функцию fn на событие name и возвращает числовой id — сохрани его, чтобы потом отписаться. Аргументы, которые получит колбэк, зависят от события (таблица ниже).
+
+events.off(id)
+events.off(id: integer) -> boolean   -- true, если подписка существовала
+#
+Все события
+Событие	Аргументы колбэка	Когда вызывается
+paint	—	каждый кадр отрисовки; единственный контекст для render.*
+createmove	cmd: wl.cmd	каждая команда движения (движок → сервер)
+frame_stage	stage: integer (stage.*)	стадии кадра: lagcomp, net_update_end, render_start
+override_view	view: wl.view	перед построением кадра камеры
+menu_toggled	open: boolean	открытие/закрытие меню клиента
+level_init	map: string	загрузка карты (имя карты в аргументе)
+level_shutdown	—	выход с карты / отключение
+movement_hit	string, number, number	смысл аргументов не установлен (?)
+player_esp	player: wl.entity, box: {left, top, right, bottom}	отрисовка ESP-бокса игрока
+unload	—	выгрузка скрипта
+любое игровое событие	ev: wl.event	player_hurt, player_death, bomb_planted и все остальные события CS2
+#
+Примеры подписок
+жизненный цикл скрипта
+lua
+Копировать
+-- 1. Отрисовка: текст в левом верхнем углу
+events.on("paint", function()
+    render.text(24, 90, color("#45d6b5"), "my script · " .. globals.tickcount())
+end)
+
+-- 2. Игровое событие: реагируем на урон
+local hurt_id = events.on("player_hurt", function(ev)
+    local victim = ev:get_pawn("userid")
+    local attacker = ev:get_pawn("attacker")
+    if victim and attacker and attacker:is_local() then
+        log.chat("Минус ", ev:get_int("dmg_health"), " HP (осталось ", victim:health(), ")")
+    end
+end)
+
+-- 3. Смена карты: сбрасываем накопленные данные
+local stats = {}
+events.on("level_init", function(map)
+    stats = {}
+    print("Зашли на карту: " .. map)
+end)
+
+-- 4. Отписка, когда обработчик больше не нужен
+-- events.off(hurt_id)
+Совет
+
+Игровые события CS2 (player_hurt, player_death, round_start, bomb_planted…) подписываются тем же events.on — клиент проксирует их движок → Lua. Поля события читаются методами wl.event (get_int, get_string, get_pawn…).
+
+05
+Встроенные типы — vector, color, math, json, db
+Прелюдия, которую клиент подмешивает в каждый скрипт до выполнения: конструкторы векторов и цветов, расширения math, JSON и маленькая JSON-база db. Исходники прелюдии приведены в приложении.
+
+vector(x?, y?, z?)
+vector(x?: number, y?: number, z?: number) -> vector   -- недостающие = 0
+Создаёт таблицу {x, y, z} с метатаблицей. Перегружены операторы: + - * / (с вектором или числом — число применяется ко всем осям), унарный -, сравнение == и tostring.
+
+операторы
+lua
+Копировать
+local a = vector(10, 20, 30)
+local b = vector(1, 2, 3)
+
+print(a + b)       -- vector(11.000, 22.000, 33.000)
+print(a * 2)       -- vector(20.000, 40.000, 60.000)
+print(a == vector(10, 20, 30))  -- true
+print(tostring(a)) -- vector(10.000, 20.000, 30.000)
+Методы vector
+Метод	Что делает
+:length()	длина вектора
+:length_sqr()	квадрат длины — быстрее, когда сравниваешь расстояния
+:length2d()	длина без учёта z (по горизонтали)
+:dist(o) / :dist2d(o)	расстояние до другого вектора
+:dot(o)	скалярное произведение
+:cross(o)	векторное произведение
+:normalized()	вектор длины 1 того же направления (нулевой вернёт vector())
+:clone()	копия вектора
+:unpack()	возвращает три числа: x, y, z
+:is_zero()	true, если все оси нулевые
+:lerp(o, t)	линейная интерполяция к o на долю t
+:forward()	вектор направления из углов: vector(pitch, yaw) → направление
+:angle_vectors()	из углов (pitch, yaw, roll) → forward, right, up
+:angles()	из направления → vector(pitch, yaw, 0)
+геометрия на векторах
+lua
+Копировать
+local me = entity.local_pawn()
+local enemy = entity.players()[1].pawn
+
+-- дистанция по земле (метры ≈ юниты / 39.37, но для сравнений хватает юнитов)
+local d = me:origin():dist2d(enemy:origin())
+
+-- углы, куда нужно смотреть, чтобы целиться в кость головы (6)
+local head = enemy:bone(6)
+local aim = math.calc_angle(me:eye_position(), head)
+
+-- точка в 100 юнитах перед игроком
+local ahead = me:origin() + me:eye_angles():forward() * 100
+color(r?, g?, b?, a?) / color('#RRGGBB[AA]')
+color(r?: number, g?: number, b?: number, a?: number) -> color
+color(hex: string) -> color   -- "#RRGGBB" или "#RRGGBBAA"
+Таблица {r, g, b, a}, каналы 0..255, по умолчанию 255. Форма с одним числом color(v) даёт серый (v, v, v). Все C-функции API читают цвет именно из полей r, g, b, a (значения обрезаются до 0..255, a по умолчанию 255), поэтому свою «цветоподобную» таблицу передать можно — но если передать не таблицу, получишь ошибку bad argument #N (a color is needed: color(r, g, b, a)).
+
+создание цвета
+lua
+Копировать
+local white   = color(255, 255, 255)        -- непрозрачный белый
+local overlay = color(15, 18, 25, 210)      -- тёмный с прозрачностью
+local brand   = color("#45d6b5")            -- то же, что color(69, 214, 181)
+local accent  = color("#e8b04bcc")          -- hex с альфой
+local gray    = color(128)                  -- серый (128, 128, 128)
+Методы color
+Метод	Что делает
+:alpha(a)	копия с другой альфой
+:lerp(o, t)	интерполяция к цвету o на долю t
+:unpack()	четыре числа: r, g, b, a
+:hex()	строка %02x%02x%02x%02x
+:hsv()	возвращает h, s, v (каждое 0..1)
+:darken(f = 0.5)	затемнение на долю f
+:lighten(f = 0.5)	осветление на долю f
+:gray()	обесцвечивание по весам 0.299/0.587/0.114
+color_hsv(h, s, v, a?)
+color_hsv(h: number, s: number, v: number, a?: number) -> color   -- h закручивается по модулю 1
+Цвет из HSV-представления. Удобно для «радуги» по времени: color_hsv(globals.realtime() % 1, 1, 1).
+
+color_percent(p, a?)
+color_percent(p: number, a?: number) -> color   -- p обрезается в 0..1
+Готовый градиент «красный → зелёный» по проценту. Идеален для полосок HP: color_percent(hp / 100).
+
+Расширения math
+Функция	Что делает
+math.clamp(v, lo, hi)	зажать v в диапазон [lo, hi]
+math.lerp(a, b, t)	a + (b - a) * t
+math.round(v)	округление до целого (floor(v + 0.5))
+math.remap(v, a, b, c, d)	перенос v из [a, b] в [c, d]
+math.normalize_angle(a)	угол в диапазон (-180, 180]
+math.calc_angle(from, to)	углы между точками: (to - from):angles()
+плавное появление оверлея
+lua
+Копировать
+local alpha = 0
+local target = 1
+
+events.on("paint", function()
+    -- догоняем target со скоростью 8 долей в секунду
+    alpha = math.lerp(alpha, target, math.clamp(globals.frametime() * 8, 0, 1))
+
+    local c = color("#45d6b5"):alpha(alpha * 255)
+    render.rect_filled(20, 80, 200, 40, color(15, 18, 25):alpha(alpha * 210), 8)
+    render.text(32, 92, c, "fading panel")
+end)
+json
+json.encode(v: any) -> string   -- вложенность не больше 200
+json.decode(text: string) -> value | nil, err
+json.null   -- метка JSON null (таблица-заглушка)
+Чистый Lua-кодек без внешних зависимостей. decode при ошибке возвращает nil и текст ошибки — проверяй оба возвращаемых значения. NaN и ±inf кодируются как null.
+
+encode / decode
+lua
+Копировать
+local payload = json.encode({ name = "stats", kills = 12, headshots = 7, tags = {"ace", "clutch"} })
+-- '{"name":"stats","kills":12,"headshots":7,"tags":["ace","clutch"]}'
+
+local data, err = json.decode(payload)
+if not data then
+    print("JSON-ошибка: " .. tostring(err))
+    return
+end
+print(data.kills) -- 12
+db — маленькая JSON-база
+db.save(name: string, value: any) -> boolean
+db.load(name: string, default: any) -> value
+Надстройка над db._read/db._write (после инициализации они обнуляются). Каждое имя — отдельный файл C:\neverwin\scripts\data\db\<имя>.json. В имени допустимы только буквы, цифры, _ и -.
+
+сохранить статистику между сессиями
+lua
+Копировать
+local stats = db.load("my_stats", { kills = 0, shots = 0, hits = 0 })
+
+events.on("player_hurt", function(ev)
+    local attacker = ev:get_pawn("attacker")
+    if attacker and attacker:is_local() then
+        stats.hits = stats.hits + 1
+        db.save("my_stats", stats)
+    end
+end)
+
+events.on("paint", function()
+    local acc = stats.shots > 0 and math.round(stats.hits / stats.shots * 100) or 0
+    render.text(24, 140, color(255, 255, 255),
+        string.format("Точность сессий: %d%%", acc))
+end)
+Заметка
+
+db — для небольших структур (настройки, статистика). Для больших или бинарных данных используй file.* из insecure-раздела.
+
+06
+Игроки и объекты — entity
+Модуль для доступа к игровым объектам: локальный игрок, все игроки на карте, оружие, любые сущности по имени класса. В CS2 у игрока два объекта: controller (счёт, ник) и pawn (тело, здоровье, оружие).
+
+#
+Получение объектов
+entity.local_pawn()
+entity.local_pawn() -> wl.entity | nil
+Локальный pawn — «тело» твоего игрока: здоровье, позиция, оружие. В меню/лобби равен nil.
+
+entity.local_controller()
+entity.local_controller() -> wl.entity | nil
+Локальный контроллер — ник, деньги, статистика.
+
+entity.get(index)
+entity.get(index: int) -> wl.entity | nil
+Объект по индексу в списке сущностей.
+
+entity.from_handle(h)
+entity.from_handle(h: number) -> wl.entity | nil
+Объект по сетевому handle (например, из полей схемы m_h*).
+
+entity.from_address(addr)
+entity.from_address(addr: number) -> wl.entity
+Обёртка вокруг произвольного адреса памяти сущности. Для insecure-сценариев.
+
+entity.players()
+entity.players() -> { {controller = wl.entity, pawn = wl.entity | nil}, ... }
+Все игроки на карте парами «контроллер + pawn». У мёртвых/неподключённых pawn может быть nil.
+
+entity.all(class_name?)
+entity.all(class_name?: string) -> { wl.entity, ... }
+Все сущности, опционально отфильтрованные по имени класса (C_CSPlayerPawn, CC4, CSmokeGrenadeProjectile…).
+
+обход всех живых противников
+lua
+Копировать
+local function for_each_enemy(fn)
+    for _, e in ipairs(entity.players()) do
+        local pawn = e.pawn
+        if pawn and pawn:alive() and pawn:is_enemy() and not pawn:is_local() then
+            fn(pawn, e.controller)
+        end
+    end
+end
+
+events.on("paint", function()
+    for_each_enemy(function(pawn, controller)
+        local x, y = render.world_to_screen(pawn:origin())
+        if x then
+            render.text(x, y, color(255, 120, 110), controller:name())
+        end
+    end)
+end)
+#
+Объект wl.entity — все методы
+Метод	Возвращает
+:address()	number — адрес в памяти
+:class_name()	string — имя класса (C_CSPlayerPawn, C_AK47…)
+:health() / :armor() / :team()	integer — HP, броня, команда
+:alive()	boolean
+:name()	string — ник игрока
+:origin() / :velocity()	vector — позиция / скорость
+:eye_position() / :eye_angles() / :aim_punch()	vector — глаза / углы обзора / отдача
+:bone(index: int)	vector | nil — позиция кости
+:pawn()	wl.entity | nil — controller → его pawn
+:weapon()	wl.entity | nil — активное оружие
+:weapons()	{ wl.entity } — всё оружие (m_hMyWeapons)
+:is_enemy() / :is_local()	boolean
+:steam_id()	string (%llu) | nil
+:ping() / :money()	integer | nil
+:observer_target()	wl.entity | nil — за кем наблюдает
+:bbox()	left, top, right, bottom на экране | nil
+:flags()	integer — m_fFlags
+:on_ground() / :scoped()	boolean
+:hitbox(index: int)	vector | nil — центр хитбокса
+:hitboxes()	массив хитбоксов с группами, радиусами, центрами
+:weapon_info()	объект данных оружия | nil
+:avatar(size?: int)	wl.texture — аватар Steam (1..512)
+:get(...) / :set(...)	чтение/запись полей по схеме или оффсету (set — insecure)
+:vdata(field, type, class?)	значение из VData оружия (?)
+== / tostring	сравнение по адресу; tostring → "entity(<index>:<class>)"
+:bone(index) — позиция кости
+entity:bone(index: int) -> vector | nil
+Позиция кости в мировых координатах. Чаще всего используют 6 — голова. Возвращает nil, если скелет ещё не обновился в этом кадре.
+
+имена над головами
+lua
+Копировать
+events.on("paint", function()
+    local me = entity.local_pawn()
+    if not me then return end
+    for _, e in ipairs(entity.players()) do
+        local pawn = e.pawn
+        if pawn and pawn:alive() and pawn:is_enemy() then
+            local head = pawn:bone(6)
+            if head then
+                local x, y = render.world_to_screen(head + vector(0, 0, 8))
+                if x then
+                    local w = render.text_size(e.controller:name())
+                    render.text(x - w / 2, y, color(255, 255, 255), e.controller:name())
+                end
+            end
+        end
+    end
+end)
+:bbox() — экранный прямоугольник
+entity:bbox() -> left, top, right, bottom | nil
+Готовый 2D-бокс сущности — основа любого ESP. Возвращает четыре числа или nil, если объект за камерой.
+
+бокс + полоска HP
+lua
+Копировать
+events.on("paint", function()
+    for _, e in ipairs(entity.players()) do
+        local pawn = e.pawn
+        if pawn and pawn:alive() and pawn:is_enemy() then
+            local l, t, r, b = pawn:bbox()
+            if l then
+                local box = color("#e8b04b")
+                render.rect(l, t, r - l, b - t, box:alpha(200), 0, 1)
+
+                -- полоска HP слева от бокса: цвет по проценту здоровья
+                local hp = math.clamp(pawn:health(), 0, 100) / 100
+                local h = (b - t) * hp
+                render.rect_filled(l - 5, b - h, 2, h, color_percent(hp))
+            end
+        end
+    end
+end)
+:hitbox(index) и :hitboxes()
+entity:hitbox(index: int) -> vector | nil
+entity:hitboxes() -> { {index, group, group_name, radius, bone, shape, center, mins, maxs, ...}, ... }
+Хитбоксы точнее костей: у каждого есть группа (group_name — «Head», «Chest»…), радиус и центр. Удобно для автовыбора точки прицеливания или отладки.
+
+центр головы через хитбокс
+lua
+Копировать
+local function head_center(pawn)
+    for _, hb in ipairs(pawn:hitboxes()) do
+        if hb.group_name == "Head" then
+            return hb.center
+        end
+    end
+    return pawn:bone(6) -- запасной вариант
+end
+:weapon_info() — данные активного оружия
+entity:weapon_info() -> {def, name, display, type, gun, clip, reserve, max_clip, max_speed, full_auto, can_shoot, inaccuracy, spread, ...} | nil
+Вызывается у оружия (me:weapon():weapon_info()). Даёт всё для HUD: патроны, разброс, тип.
+
+индикатор патронов
+lua
+Копировать
+events.on("paint", function()
+    local me = entity.local_pawn()
+    local weapon = me and me:weapon()
+    local info = weapon and weapon:weapon_info()
+    if not info then return end
+
+    local w, h = render.screen_size()
+    local text = string.format("%s · %d / %d", info.display, info.clip, info.reserve)
+    local tw = render.text_size(text)
+    render.text(w / 2 - tw / 2, h - 90,
+        info.clip == 0 and color("#ef6a5a") or color(255, 255, 255), text)
+end)
+:avatar(size?)
+entity:avatar(size?: int) -> wl.texture   -- 1..512
+Текстура аватара игрока из Steam — рисуй через render.image, например, в табе скоринга.
+
+:get(...) / :set(...) — сырые поля
+set — только insecure
+entity:get(class: string, field: string, type: string) -> value
+entity:get(offset: int, type: string) -> value
+entity:set(class, field, type, value)   -- insecure
+Чтение любого поля через сетевую схему (пара «класс + поле») или по прямому оффсету. Допустимые типы: int uint short byte int64 float double bool ptr vector handle string (string — только чтение). Если поля нет в схеме — ошибка schema: no field <class>::<field>.
+
+чтение полей схемы
+lua
+Копировать
+local me = entity.local_pawn()
+
+-- сколько денег у локального игрока (у контроллера)
+local ctrl = entity.local_controller()
+print(ctrl:get("CCSPlayerController", "m_iAccount", "int"))
+
+-- сколько осталось flash-эффекта
+print(me:get("C_CSPlayerPawn", "m_flFlashDuration", "float"))
+
+-- оффсет из schema.offset — без имени класса
+local off = schema.offset("C_CSPlayerPawn", "m_iHealth")
+print(me:get(off, "int"))
+:vdata(field, type, class?)
+entity:vdata(field: string, type: string, class?: string = "CCSWeaponBaseVData") -> value   -- (?)
+Чтение данных VData оружия (базовые ТТХ из ресурсов игры). Назначение некоторых аргументов уточняется.
+
+07
+Отрисовка и ресурсы — render
+Экранное 2D-API: примитивы, текст, текстуры, шрифты и масштабирование. Почти всё рисование живёт строго внутри paint; измеряющие функции (размеры текста, world_to_screen) работают где угодно.
+
+Контекст
+
+Функции рисования вызываются только внутри paint — иначе ошибка render.* draws only inside a paint callback. Вне paint разрешён блок «Измерения и ресурсы» ниже.
+
+#
+Фигуры (только paint)
+Сигнатура	Что рисует
+render.rect(x, y, w, h, color, rounding?, thickness?, corners?)	контур прямоугольника; corners — битовая маска или строка углов
+render.rect_filled(x, y, w, h, color, rounding?, corners?)	залитый прямоугольник
+render.rect_filled_multicolor(x, y, w, h, c1, c2, c3, c4)	залитый прямоугольник, цвет в каждом углу
+render.gradient(x, y, w, h, color1, color2, horizontal?)	линейный градиент
+render.line(x1, y1, x2, y2, color, thickness?)	линия
+render.circle(x, y, radius, color, segments?, thickness?)	окружность
+render.circle_filled(x, y, radius, color, segments?)	залитый круг
+render.circle_gradient(x, y, radius, inner, outer, segments?)	круг с радиальным градиентом
+render.triangle_filled(x1, y1, x2, y2, x3, y3, color)	залитый треугольник
+render.triangle_multicolor(x1, y1, c1, x2, y2, c2, x3, y3, c3)	треугольник с цветом в вершинах
+render.poly(points, color, thickness?, closed?)	полилиния по точкам {{x, y}, …}
+render.poly_filled(points, color)	залитый полигон
+render.pie(x, y, radius, fraction, color, segments?, start?)	сектор круга, fraction — доля заполнения (?)
+render.arc(x, y, radius, start_deg, end_deg, color, thickness?, segments?)	дуга в градусах
+render.shadow(x, y, w, h, color, thickness?, rounding?)	мягкая тень вокруг прямоугольника
+render.blur(x, y, w, h, strength?, tint?) → boolean	размытие области экрана
+панель со всеми примитивами
+lua
+Копировать
+events.on("paint", function()
+    local x, y, w, h = 40, 120, 260, 150
+
+    -- фон: тень + подложка + лёгкий градиент сверху
+    render.shadow(x, y, w, h, color(0, 0, 0, 140), 18, 10)
+    render.rect_filled(x, y, w, h, color(14, 18, 26, 235), 10)
+    render.gradient(x, y, w, 46, color("#45d6b522"), color("#45d6b500"), false)
+    render.rect(x, y, w, h, color("#2a3a4d"), 10, 1)
+
+    -- заголовок и разделитель
+    render.text(x + 16, y + 15, color("#45d6b5"), "PANEL")
+    render.line(x + 12, y + 46, x + w - 12, y + 46, color("#2a3a4d"))
+
+    -- круговой индикатор: дуга на 65%
+    render.circle(x + 44, y + 96, 26, color("#1d2a3a"), 48, 5)
+    render.arc(x + 44, y + 96, 26, -90, -90 + 360 * 0.65, color("#e8b04b"), 5, 48)
+    render.text(x + 33, y + 90, color(255, 255, 255), "65%")
+
+    -- столбчатая мини-диаграмма полигонами
+    local base = y + h - 24
+    for i, v in ipairs({ 0.4, 0.9, 0.6, 1.0, 0.75 }) do
+        local bh = 52 * v
+        render.rect_filled(x + 100 + (i - 1) * 22, base - bh, 14, bh,
+            color("#45d6b5"):alpha(90 + 160 * v), 3)
+    end
+end)
+#
+Текст
+render.text(x, y, color, text, flags?, size?, font?)
+только в paint
+render.text(x, y: number, color: color, text: string, flags?: string, size?: number, font?: wl.font)
+Рисует текст в точке (x, y). Необязательные flags управляют выравниванием, size переопределяет размер, font — шрифт из render.font (по умолчанию — системный шрифт меню).
+
+render.text_size(text, flags?, size?, font?) → w, h
+можно вне paint
+render.text_size(text: string, flags?, size?, font?) -> w, h
+Измеряет текст без отрисовки — чтобы центрировать или строить панели по содержимому.
+
+render.wrap_text(text, max_width, size?, font?)
+можно вне paint
+render.wrap_text(text: string, max_width: number, size?, font?) -> { line, ... }
+Разбивает текст на строки, помещающиеся в max_width пикселей.
+
+центрированный текст и перенос
+lua
+Копировать
+local f = render.font("Verdana.ttf", 14)
+local quote = "Документация — это любовь к будущему себе."
+
+events.on("paint", function()
+    local w, h = render.screen_size()
+
+    -- центрируем строку по ширине экрана
+    local title = "NEVERLOSE LUA"
+    local tw = render.text_size(title, nil, 22)
+    render.text(w / 2 - tw / 2, h * 0.2, color("#45d6b5"), title, nil, 22)
+
+    -- многострочный блок шириной 320 px
+    local y = h * 0.3
+    for _, line in ipairs(render.wrap_text(quote, 320, 14, f)) do
+        render.text(w / 2 - 160, y, color(220, 230, 240), line, nil, 14, f)
+        y = y + 20
+    end
+end)
+#
+Изображения, текстуры, шрифты
+render.image(texture, x, y, w?, h?, color?, rounding?)
+только в paint
+render.image(texture: wl.texture, x, y, w?, h?: number, color?: color, rounding?: number)
+Рисует текстуру. color тонирует изображение (белый = как есть), rounding скругляет углы.
+
+render.load_image(file, w, h) / render.load_svg(file, height)
+можно вне paint
+render.load_image(file: string, w, h: number) -> wl.texture | nil, err   -- 1..4096
+render.load_svg(file: string, height: number) -> wl.texture | nil, err   -- 1..4096
+Загружают файлы из C:\neverwin\scripts\images. Загружай один раз при старте скрипта, а не в paint — лимит 256 текстур на скрипт.
+
+render.texture(rgba, w, h)
+можно вне paint
+render.texture(rgba: string, w, h: number) -> wl.texture   -- len(rgba) = 4·w·h, размеры 1..2048
+Текстура из сырой RGBA-строки — для процедурных спрайтов. У текстуры есть метод :size() → w, h.
+
+render.icon(name, height?) / render.icons()
+можно вне paint
+render.icon(name: string, height?: number) -> wl.texture | nil, "no such icon"   -- 1..256
+render.icons() -> { name, ... }
+Встроенные иконки меню клиента. render.icons() вернёт список всех доступных имён.
+
+render.font(name, size?)
+можно вне paint
+render.font(name: string, size?: number) -> wl.font
+Шрифт из scripts\fonts или системного Windows\Fonts. Результат кэшируй в переменную; метод :loaded() подскажет, подхватился ли файл.
+
+логотип, аватары, иконки
+lua
+Копировать
+-- загружаем один раз при старте скрипта
+local logo, err = render.load_svg("logo.svg", 28)
+if not logo then print("logo: " .. tostring(err)) end
+
+local flag = render.icon("flag", 14)
+local my_font = render.font("Montserrat-Bold.ttf", 16)
+
+events.on("paint", function()
+    if logo then render.image(logo, 24, 24) end
+    if flag then render.image(flag, 60, 30) end
+
+    -- аватары противников из Steam (кэшируем!)
+    local cache = {}
+    for _, e in ipairs(entity.players()) do
+        local sid = e.controller:steam_id()
+        if sid and e.pawn and e.pawn:is_enemy() then
+            cache[sid] = cache[sid] or e.controller:avatar(32)
+            local x, y = render.world_to_screen(e.pawn:origin())
+            if x and cache[sid] then
+                render.image(cache[sid], x - 16, y - 60, 32, 32, nil, 16)
+            end
+        end
+    end
+end)
+#
+Координаты, масштаб, тема
+render.world_to_screen(v)
+можно вне paint
+render.world_to_screen(v: vector) -> x, y | nil
+Проекция 3D-точки на экран. Возвращает nil, если точка за спиной камеры — всегда проверяй перед рисованием.
+
+render.screen_size() / render.scale() / render.menu_scale()
+render.screen_size() -> w, h
+render.scale() -> number   -- DPI-масштаб: percent / 100
+render.menu_scale() -> number
+Размер окна и множители масштаба. Умножай размеры своих панелей на render.scale(), чтобы оверлей не «мельчил» на 4K с DPI 150%.
+
+render.theme(name?)
+render.theme(name?: string) -> color | { [name] = color, ... }
+Цвета текущей темы меню клиента. Без аргумента — вся палитра таблицей, с именем — конкретный цвет. Оверлей в цветах темы выглядит «родным».
+
+render.clip_push(x, y, w, h, intersect?) / render.clip_pop()
+только в paint
+render.clip_push(x, y, w, h: number, intersect?: boolean)
+render.clip_pop()
+Обрезка рисования прямоугольной областью: всё, что рисуется между push и pop, не вылезает за её границы. intersect пересекает новую область с текущей. Каждая push обязана иметь свою pop.
+
+render.blur(x, y, w, h, strength?, tint?)
+только в paint
+render.blur(x, y, w, h: number, strength?: number, tint?: color) -> boolean
+Размытие области экрана под панелью (эффект «матового стекла»). Возвращает true, если применилось.
+
+полный оверлей: blur + clip + тема
+lua
+Копировать
+local theme = render.theme()      -- палитра меню клиента
+local panel = { x = 32, y = 120, w = 240, h = 120 }
+
+events.on("paint", function()
+    render.blur(panel.x, panel.y, panel.w, panel.h, 8, color(10, 14, 20, 90))
+    render.rect_filled(panel.x, panel.y, panel.w, panel.h, color(14, 20, 28, 200), 10)
+    render.rect(panel.x, panel.y, panel.w, panel.h, theme.accent or color("#45d6b5"):alpha(60), 10, 1)
+
+    -- бегущая строка, обрезанная панелью
+    render.clip_push(panel.x + 10, panel.y + 80, panel.w - 20, 24)
+    local shift = (globals.realtime() * 60) % 500
+    render.text(panel.x + panel.w - shift, panel.y + 86, color(220, 230, 240),
+        "никогда не проигрывай · never lose · никогда не проигрывай ·")
+    render.clip_pop()
+end)
+08
+Трассировки — trace
+Лучи и объёмы против геометрии карты: видимость, прострелы, симуляция пуль и урон. Основа любого wall-чека и damage-индикатора.
+
+Контекст
+
+Всё, кроме trace.scale_damage и trace.smoke, работает только в createmove, frame_stage и колбэках игровых событий.
+
+trace.line(from, to, opts?)
+createmove · frame_stage · события
+trace.line(from: vector, to: vector, opts?) -> result
+-- opts: wl.entity (кого пропустить) | { skip, mask, layer, type, mins, maxs }
+-- result: { hit, fraction, position, normal, entity, start_solid, friction, ... }
+Луч из from в to. fraction — доля пройденного пути (1 = ничего не задето), position — точка удара, normal — нормаль поверхности, entity — сущность, в которую попали. В skip можно передать одного игрока или массив.
+
+trace.hull(from, to, mins, maxs, opts?)
+createmove · frame_stage · события
+trace.hull(from, to: vector, mins, maxs: vector, opts?) -> result
+Трассировка не лучом, а коробкой mins..maxs — проверка «пролезу ли в щель», «стою ли в дыму».
+
+trace.bullet(from, to, target?, hitgroup?)
+createmove · frame_stage · события
+trace.bullet(from, to: vector, target?: wl.entity, hitgroup?: int) -> { hit, entity, damage, penetrated, position, range, target_damage, target_hit }
+Полная симуляция выстрела: урон с учётом брони, прострелов и дистанции — тем же кодом, что стреляет игра.
+
+trace.damage(target, pos, hitgroup?, from?)
+trace.damage(target: wl.entity, pos: vector, hitgroup?: int, from?: vector) -> number
+Сколько урона получит target от выстрела в точку pos (хитгруппа и точка выстрела уточняются).
+
+trace.can_penetrate(from, to)
+trace.can_penetrate(from, to: vector) -> boolean
+Простреливаемо ли пространство между точками (без точного урона — быстрее trace.bullet).
+
+trace.scale_damage(damage, hitgroup, target)
+любой контекст
+trace.scale_damage(damage: number, hitgroup: int, target: wl.entity) -> number
+Применяет множители хитгруппы и брони к «сырому» урону.
+
+trace.smoke(from, to)
+любой контекст
+trace.smoke(from, to: vector) -> boolean, number
+Перекрывает ли дымовую гранату линия from → to; вторым числом — «плотность» перекрытия.
+
+trace.mask — константы масок
+trace.mask.visible = 1847299
+trace.mask.shot    = 1847307
+trace.mask.player  = 1839107
+Готовые битовые маски: что считать «стеной» для луча. shot учитывает всё, что останавливает пулю.
+
+damage-индикатор: сколько я даю через стену
+lua
+Копировать
+local cache = {}   -- [steam_id] = damage
+
+events.on("createmove", function(cmd)
+    local me = entity.local_pawn()
+    local weapon = me and me:weapon()
+    if not me or not weapon then return end
+
+    local from = me:eye_position()
+    for _, e in ipairs(entity.players()) do
+        local pawn = e.pawn
+        if pawn and pawn:alive() and pawn:is_enemy() then
+            local head = pawn:bone(6)
+            if head then
+                local res = trace.bullet(from, head, pawn)
+                cache[pawn:steam_id()] = res.hit and res.damage or 0
+            end
+        end
+    end
+end)
+
+events.on("paint", function()
+    local y = 160
+    for sid, dmg in pairs(cache) do
+        if dmg > 0 then
+            render.text(24, y, dmg >= 100 and color("#ef6a5a") or color("#e8b04b"),
+                string.format("%s — %d урона", sid, math.round(dmg)))
+            y = y + 18
+        end
+    end
+end)
+09
+Частицы — particle
+Создание игровых particle-эффектов из Lua: трейсеры, взрывы, маркеры. Свои .vpcf-файлы кладутся в scripts\\particles и подключаются через override.
+
+particle.create(name, attach?)
+particle.create(name: string, attach?: int) -> wl.particle
+Создаёт эффект по имени (путь к .vpcf в ресурсах игры). attach — константа particle.attach.*.
+
+particle.precache(name)
+particle.precache(name: string)
+Предзагрузка эффекта, чтобы первый create не «заикался».
+
+particle.override(game_path, file)
+particle.override(game_path: string, file: string) -> true | nil, err
+Подменяет игровой эффект game_path (путь к .vpcf) своим файлом file из scripts\particles — например, перекрасить трейсеры пуль.
+
+particle.attach — константы привязки
+absorigin=0  absorigin_follow=1  customorigin=2  customorigin_follow=3
+point=4      point_follow=5      eyes_follow=6   overhead_follow=7
+worldorigin=8 rootbone_follow=9
+Объект wl.particle
+методы возвращают self — можно цепочкой
+Метод	Что делает
+:set_point(cp, vector | x, y, z)	позиция control point 0..63
+:set_color(cp, color)	цвет control point
+:bind(cp, entity, attach?, attachment?)	привязать точку к сущности/кости
+:path({vector, ...})	траектория (минимум 2 точки)
+:lifetime(seconds)	время жизни
+:destroy()	убить эффект
+:valid() / :index()	жив ли / индекс в системе частиц
+маркер на месте смерти
+lua
+Копировать
+events.on("player_death", function(ev)
+    local pawn = ev:get_pawn("userid")
+    if not pawn then return end
+
+    local p = particle.create("particles/generic/blood_spray.vpcf") -- имя из ресурсов игры
+    p:set_point(0, pawn:origin() + vector(0, 0, 40))
+     :set_color(0, color("#ef6a5a"))
+     :lifetime(4)
+
+    -- убрать досрочно, если нужно
+    -- client.delay(2, function() p:destroy() end)
+end)
+10
+Расширения ESP — esp
+Добавление собственных элементов к встроенному ESP клиента: текст, полосы и иконки вокруг игроков. Элементы живут в настройках ESP и переключаются пользователем, как родные.
+
+esp.add_text(name, fn, opts?)
+esp.add_text(name: string, fn: function, opts?) -> wl.esp_element
+Текстовый элемент. fn вызывается для каждого игрока и возвращает строку. Сигнатура колбэка — fn(entity, bool, entity|nil), точное назначение аргументов устанавливается (?).
+
+esp.add_bar(name, fn, opts?)
+esp.add_bar(name: string, fn: function, opts?) -> wl.esp_element
+Полоса-индикатор (HP, броня, кулдаун…). Колбэк возвращает значение заполнения.
+
+esp.add_icon(name, fn, opts?)
+esp.add_icon(name: string, fn: function, opts?) -> wl.esp_element
+Иконка рядом с боксом игрока.
+
+Общие opts для всех трёх: { side = "top"|"bottom"|"left"|"right", color = color, second = color, size = int, small = bool, text = bool }.
+
+esp.remove(name)
+esp.remove(name: string)
+Удаляет элемент по имени — зови в unload, иначе элементы накапливаются между перезагрузками скрипта.
+
+Объект wl.esp_element
+el:remove()
+el:settings(target: "enemy" | "team" | "local") -> { enabled, side, color, second, size, text }
+settings читает текущие настройки элемента для выбранной цели — например, включён ли он пользователем.
+
+дистанция и броня в ESP
+lua
+Копировать
+esp.add_text("dist", function(ent)
+    local me = entity.local_pawn()
+    if not me or not ent:alive() then return "" end
+    local m = math.round(me:origin():dist(ent:origin()) / 39.37) -- юниты → метры
+    return m .. "m"
+end, { side = "bottom", size = 11 })
+
+esp.add_bar("armor", function(ent)
+    return ent:alive() and (ent:armor() / 100) or 0
+end, { side = "right", color = color("#5fb2e8") })
+
+events.on("unload", function()
+    esp.remove("dist")
+    esp.remove("armor")
+end)
+11
+Меню — ui
+Скрипт строит собственную вкладку с любыми элементами и умеет читать элементы основного меню через ui.find. Конструкторы работают и через точку, и через двоеточие: ui.checkbox(...) и tab:checkbox(...) — одно и то же.
+
+Заметка
+
+Если первым аргументом конструктору случайно пришла таблица (например, self), она молча отбрасывается — можно не бояться «лишнего» this.
+
+ui.tab(name, icon?) и группы
+ui.tab(name: string, icon?: string | wl.texture) -> tab   -- до 64 вкладок на скрипт
+tab:group(name: string) -> group   -- ui.group(name) тоже работает
+Вкладка появляется в меню клиента; icon — имя встроенной иконки (render.icons()) или своя текстура. Внутри вкладки и группы живут все конструкторы элементов.
+
+ui.sidebar(name?, icon?)
+ui.sidebar(name?: string, icon?: string | wl.texture)
+Элемент боковой панели меню для быстрого доступа к скрипту.
+
+#
+Конструкторы элементов
+Конструктор	Значение :get()
+ui.checkbox(name, default?)	boolean
+ui.slider_int(name, min, max, default?, fmt = "%d")	integer
+ui.slider_float(name, min, max, default?, fmt = "%.2f")	number
+ui.combo(name, items, default_index?)	индекс выбранного пункта
+ui.multi_combo(name, items, defaults?)	таблица { [item] = bool }
+ui.listbox(name, items, default?, height?)	индекс выбранного пункта
+ui.color(name, default?, alpha?)	color
+ui.button(name, callback?)	— (действие по клику)
+ui.text(name, default?)	string — поле ввода
+ui.label(text)	— (подпись)
+ui.keybind(name, key?)	клавиша; :active() — состояние
+ui.divider(text?)	— (разделитель)
+ui.image(name, texture, height?)	— (картинка)
+ui.custom(name, height, fn)	— (свой элемент в сетке меню)
+ui.widget(name, w, h, fn)	— (свободно позиционируемый виджет)
+fmt у слайдеров — формат подписи ("%d°", "%.1f m"…). defaults у multi_combo — таблица булевых значений или индексов.
+
+#
+custom и widget — свои элементы
+Колбэк fn(x, y, w, h, input) рисуется в координатах меню. Объект input передаёт состояние мыши и клавиш:
+
+Поле	Смысл
+mx, my	позиция мыши
+hover / hovered	наведение в этом кадре / флаг наведения
+down, clicked, released	кнопка мыши: удерживается / нажата / отпущена
+click, rclick	события левого и правого клика
+right_down, right_clicked	правая кнопка: удерживается / клик
+active	элемент в фокусе взаимодействия
+dragging	идёт перетаскивание
+x, y	позиция элемента
+wheel	прокрутка колеса
+своя кнопка-переключатель через ui.custom
+lua
+Копировать
+local tab = ui.tab("Custom UI")
+local on = false
+
+tab:custom("toggle", 40, function(x, y, w, h, input)
+    -- хитбокс
+    if input.hovered and input.clicked then
+        on = not on
+    end
+
+    local bg = on and color("#45d6b533") or color(255, 255, 255, 10)
+    local border = on and color("#45d6b5") or color(255, 255, 255, 40)
+    render.rect_filled(x, y, w, h, bg, 8)
+    render.rect(x, y, w, h, input.hovered and border:lighten(0.2) or border, 8, 1)
+
+    local label = on and "ON" or "OFF"
+    local tw = render.text_size(label)
+    render.text(x + w / 2 - tw / 2, y + h / 2 - 8, on and color("#45d6b5") or color(255, 255, 255, 140), label)
+end)
+Совет
+
+Внутри ui.custom/ui.widget рисование идёт в контексте меню — это не paint, координаты приходят в аргументах.
+
+#
+Объект wl.ui — элемент скрипта
+:get(index?) / :set(value, ...)
+el:get(index?) -> bool | int | number | string | {[item] = bool} | color
+el:set(value, ...)
+Чтение и запись значения. Тип зависит от конструктора (таблица выше).
+
+:visible(bool?)
+el:visible(b?: boolean)
+Без аргумента — геттер («виден ли?»), с аргументом — сеттер.
+
+:depends(other, value?)
+el:depends(other: wl.ui, value?) -> self
+Показывать элемент, только пока other равен value (без value — пока включён). Возвращает self — можно писать цепочкой.
+
+:callback(fn)
+el:callback(fn: function) -> self
+Колбэк на каждое изменение значения пользователем или через :set().
+
+:items(list)
+el:items(list: {string}) -> self
+Заменяет пункты — только для combo и listbox.
+
+:active()
+el:active() -> boolean
+Только для keybind: удерживается/включена ли привязанная клавиша (зависит от режима бинда).
+
+:name()
+el:name() -> string
+:tooltip(text?)
+el:tooltip(text?: string) -> self
+Всплывающая подсказка при наведении.
+
+:inactive(bool, reason?)
+el:inactive(b: boolean, reason?: string) -> self
+Визуально «выключить» элемент и показать причину — например, когда функция недоступна в текущем режиме.
+
+:image(texture)
+el:image(t: wl.texture) -> self
+Иконка слева от элемента.
+
+:position() / :set_position(x, y)
+el:position() -> x, y
+el:set_position(x, y: number) -> self
+Позиция элемента в меню — для кастомных раскладок.
+
+полноценная вкладка настроек
+lua
+Копировать
+local tab = ui.tab("My Script", "settings")
+local aim = tab:group("Прицел")
+local hud = tab:group("HUD")
+
+-- элементы
+local master  = aim:checkbox("Включить", true):tooltip("Мастер-переключатель скрипта")
+local smooth  = aim:slider_float("Сглаживание", 0, 1, 0.35, "%.2f")
+local bone    = aim:combo("Кость", {"Голова", "Шея", "Грудь"}, 1)
+local hotkey  = aim:keybind("Клавиша активации")
+local tint    = hud:color("Цвет HUD", color("#45d6b5"), true)
+local items   = hud:multi_combo("Показывать", {"HP", "Броня", "Патроны"}, {true, true, false})
+local reset   = hud:button("Сбросить статистику", function()
+    db.save("my_stats", { kills = 0, shots = 0, hits = 0 })
+    client.notify("Статистика сброшена", "My Script")
+end)
+
+-- подчинённая видимость: слайдер живёт, пока включён master
+smooth:depends(master, true)
+
+-- реакция на изменения
+master:callback(function(v)
+    client.notify(v and "Скрипт включён" or "Скрипт выключен", "My Script")
+end)
+
+bone:items({"Голова", "Шея", "Грудь", "Живот"}) -- пункты можно заменить позже
+
+-- чтение в рантайме
+events.on("paint", function()
+    if not master:get() or not hotkey:active() then return end
+    local flags = {}
+    for name, on in pairs(items:get()) do
+        if on then flags[#flags + 1] = name end
+    end
+    render.text(24, 120, tint:get(),
+        string.format("кость: %s · %s", bone:get(), table.concat(flags, ", ")))
+end)
+#
+Доступ к основному меню
+ui.find(page, group, ...name)
+ui.find(page: string, group: string, ...name: string) -> wl.menu_control | group
+Находит элемент (или группу) основного меню клиента по пути: страница → группа → имя элемента. Так скрипт интегрируется с родным Rage/Legit и читает его настройки.
+
+ui.binds(active_only?)
+ui.binds(active_only?: boolean) -> { {name, mode, value, reference, is_active}, ... }
+Список биндов основного меню — то, что отображается в «списке биндов» на экране.
+
+Объект wl.menu_control
+Метод	Назначение
+get / get_value / set_value	значение элемента
+get_raw_value / set_raw_value	«сырое» значение без преобразований
+get_values / set_values	значения multi-select элементов
+get_raw_values / set_raw_values	сырые значения multi-select
+get_effective_values	итоговые значения с учётом условий
+get_default / set_default	значение по умолчанию
+get_name / get_id / get_type	имя / id / тип: toggle, slider, combo, multicombo, unknown
+get_visible / set_visible(b)	видимость
+get_disabled / set_disabled(b)	доступность
+get_tooltip / get_icon	подсказка и иконка
+get_is_down	нажат ли сейчас
+get_parent / group()	родительская группа
+get_items	пункты combo
+get_min / set_min(v) / get_max / set_max(v)	границы слайдера
+export()	состояние элемента JSON-строкой
+add_callback(fn) / remove_callback(fn)	колбэки на изменение
+Только чтение
+
+Методы set_name, set_icon, import, color_picker, color_set, color_modes, set_tooltip, set_items, set_category, chip существуют, но на встроенных элементах бросают ошибки: script does not own this element, option is not a color picker, chips can only be added to entity elements. Они предназначены для элементов, созданных самим скриптом.
+
+читаем и слушаем основное меню
+lua
+Копировать
+-- включатель Rage-бота (путь — как в меню клиента)
+local rage = ui.find("Aimbot", "Ragebot", "Enabled")
+if rage then
+    print("Ragebot сейчас: " .. tostring(rage:get_value()))
+
+    rage:add_callback(function()
+        log.console("Ragebot переключён пользователем")
+    end)
+end
+
+-- границы слайдера можно раздвинуть
+local fov = ui.find("Visuals", "View", "FOV")
+if fov and fov:get_type() == "slider" then
+    fov:set_max(160)
+end
+Состояние окна меню
+ui.alpha() -> number   -- прозрачность меню (анимация открытия)
+ui.scale(name_or_value, ...) -> number
+ui.position() / ui.size() -> vector
+ui.cursor() -> vector
+ui.style(key?) -> value | table
+ui.localize(lang, key, text)
+ui.units(value?) -> string | number, string   -- "metric"/"imperial", "m"/"ft"
+ui.beta_exploits(enable?) -> boolean
+Служебные функции: позиция/размер окна, курсор в координатах меню, стили для отрисовки «в тон» клиенту, локализация строк и единицы измерения. ui.alpha() удобна, чтобы гасить свой оверлей вместе с меню.
+
+12
+Команды движения — wl.cmd
+Объект команды приходит аргументом в createmove и описывает всё, что клиент отправит серверу в этом тике: кнопки, движение, углы, сабтики. Изменяя его, скрипт управляет персонажем.
+
+Время жизни
+
+Объект wl.cmd валиден только внутри своего колбэка createmove. Сохранять его в переменную «на потом» нельзя.
+
+Методы wl.cmd
+Метод	Назначение
+:number() / :tick()	номер команды / тик
+:buttons() / :set_buttons(mask)	маска кнопок
+:has(btn)	нажата ли кнопка
+:press(btn) / :release(btn)	нажать / отпустить кнопку
+:move() / :set_move(forward, side, ?bool)	вектор движения (W/S, A/D)
+:upmove() / :set_upmove(v)	вертикальное движение (прыжок/присед)
+:view_angles() / :set_view_angles(v)	углы команды
+:lock_angles()	запретить клиенту менять углы после скрипта
+:rotate_movement(yaw, ?bool)	повернуть вектор движения на yaw (движение «спиной» без потери траектории)
+:mouse_delta()	dx, dy мыши за тик
+:predicted()	команда предсказана клиентом
+:subticks()	список сабтиков CS2
+:add_subtick({...}) / :clear_subticks()	добавить/очистить сабтики
+:add_button(btn, when?, pressed?) / :remove_button(btn)	управление кнопками в сабтиках
+Сабтик — {index, when, button, pressed, forward, left, pitch, yaw, is_button}; при добавлении достаточно {when, button, pressed, yaw, left, forward}.
+
+buttons.* — маски кнопок
+attack = 1     jump = 2      duck = 4      forward = 8    back = 16
+use = 32       left = 512    right = 1024  attack2 = 2048 reload = 8192
+speed = 65536  button.sprint = 65536  button.score = 8589934592
+Константы доступны и как buttons.*, и как button.*. Комбинируются битовым bit.bor.
+
+stage.* — стадии frame_stage
+stage.lagcomp = 6   stage.net_update_end = 7   stage.render_start = 12
+Аргумент frame_stage: на какой стадии кадра вызван колбэк. Данные игроков свежее всего после net_update_end.
+
+bunny hop и авто-стрейф
+lua
+Копировать
+local tab = ui.tab("Movement")
+local bhop = tab:checkbox("Bunny hop", true)
+local autostrafer = tab:checkbox("Auto strafe", true)
+
+events.on("createmove", function(cmd)
+    local me = entity.local_pawn()
+    if not me or not me:alive() then return end
+
+    if bhop:get() and cmd:has(buttons.jump) and not me:on_ground() then
+        cmd:release(buttons.jump) -- отпускаем прыжок в воздухе
+    end
+
+    if autostrafer:get() and not me:on_ground() then
+        local dx, dy = cmd:mouse_delta()
+        if dx ~= 0 then
+            cmd:set_move(0, dx > 0 and 450 or -450) -- стрейф по движению мыши
+        end
+    end
+end)
+13
+Камера — wl.view
+Аргумент события override_view. Позволяет переопределить FOV, позицию и углы камеры до построения кадра — кастомный FOV, тряска, «свободная камера».
+
+Методы wl.view
+только в override_view
+view:fov() / view:set_fov(v)
+view:viewmodel_fov() / view:set_viewmodel_fov(v)
+view:origin() / view:set_origin(v)
+view:angles() / view:set_angles(v)
+view:aspect()
+FOV со слайдером и лёгким зумом при прицеле
+lua
+Копировать
+local tab = ui.tab("Camera")
+local fov = tab:slider_int("FOV", 60, 150, 100)
+local zoom = tab:checkbox("Зум при scope", true)
+
+events.on("override_view", function(view)
+    local me = entity.local_pawn()
+    local target = fov:get()
+
+    if zoom:get() and me and me:scoped() then
+        target = math.max(45, target - 30)
+    end
+
+    view:set_fov(target)
+    view:set_viewmodel_fov(math.min(target, 68))
+end)
+14
+Объект игрового события — wl.event
+Приходит в колбэки игровых событий (player_hurt, player_death, round_start…). Обёртка над данными события движка: поля читаются по имени, игроки — сразу как wl.entity.
+
+Методы wl.event
+только в своём колбэке
+ev:name() -> string
+ev:get_int(key) / ev:get_float(key) / ev:get_bool(key) / ev:get_string(key)
+ev:get_controller(key) -> wl.entity
+ev:get_pawn(key) -> wl.entity
+Типичные ключи: userid (жертва), attacker, weapon, dmg_health, health, headshot. Точный набор полей — как у событий CS2.
+
+килл-фид в чат
+lua
+Копировать
+events.on("player_death", function(ev)
+    local victim = ev:get_pawn("userid")
+    local attacker = ev:get_pawn("attacker")
+    if not victim or not attacker then return end
+
+    local weapon = ev:get_string("weapon")
+    local hs = ev:get_bool("headshot") and " в голову" or ""
+
+    if attacker:is_local() then
+        log.chat("Фраг: ", victim:name(), " (", weapon, hs, ")")
+    elseif victim:is_local() then
+        log.chat("Меня убил ", attacker:name(), " из ", weapon)
+    end
+end)
+15
+engine, globals, input, game
+Состояние движка и игры: консольные команды, углы обзора, время, клавиатура, фазы матча.
+
+#
+engine — движок
+engine.exec(cmd)
+engine.exec(cmd: string)
+Выполняет консольную команду, как если бы её ввели в консоли: engine.exec("buy ak47").
+
+engine.in_game() / engine.screen_size()
+engine.in_game() -> boolean
+engine.screen_size() -> w, h
+Подключены ли к матчу; размер окна движка.
+
+engine.play_sound(name)
+engine.play_sound(name: string)
+Проигрывает звук интерфейса через panorama $.PlaySoundEvent — например, "UIPanorama.popup_accept_match_beep".
+
+engine.view_angles() / engine.set_view_angles(v)
+engine.view_angles() -> vector
+engine.set_view_angles(v: vector) -> boolean
+Мгновенно повернуть камеру (вне тиков команды). Для плавного аима лучше писать углы в cmd внутри createmove.
+
+engine.camera_angles()
+engine.camera_angles() -> vector
+Реальные углы камеры (с учётом view-модификаторов, spectate и т.п.).
+
+engine.max_speed()
+engine.max_speed() -> number
+Текущая максимальная скорость игрока (зависит от оружия, приседа).
+
+engine.post_state()
+engine.post_state() -> { valid, status, flags, on_ground, move_type, landed_frac, landed, tick, origin, velocity, ... }
+Состояние локального игрока после предсказания движения — то, что клиент «видит» в конце тика.
+
+engine.simulate(ticks, fn?)
+только в createmove
+engine.simulate(ticks: int, fn?: function) -> { {valid, flags, on_ground, move_type, jumped, landed, landed_frac, duck, origin, velocity}, ... }
+Предсказание движения на N тиков вперёд — траектории прыжков, тайминги приземления. Основа индикаторов jump-bug и стрейф-трейнеров.
+
+индикатор скорости и приземления
+lua
+Копировать
+events.on("paint", function()
+    local me = entity.local_pawn()
+    if not me then return end
+
+    local w, h = render.screen_size()
+    local vel = math.round(me:velocity():length2d())
+    render.text(w / 2 - 30, h - 140,
+        me:on_ground() and color(255, 255, 255) or color("#45d6b5"),
+        tostring(vel) .. " u/s")
+end)
+
+-- где я окажусь через 32 тика, если ничего не нажимать
+events.on("createmove", function(cmd)
+    local future = engine.simulate(32)
+    local last = future[#future]
+    if last and last.valid then
+        -- например, пометить точку приземления в paint через world_to_screen
+    end
+end)
+#
+globals — время
+Функции времени
+globals.curtime() -> number   -- время игры (секунды, тикает с сервером)
+globals.realtime() -> number   -- реальное время клиента (= os.clock())
+globals.frametime() -> number   -- длительность последнего кадра
+globals.interval() -> 0.015625   -- интервал серверного тика (64 tick)
+globals.tickcount() / globals.framecount() -> integer
+Для анимаций бери realtime (не замирает), для игровой логики — curtime и tickcount.
+
+#
+input — клавиатура и курсор
+Функции ввода
+input.key_down(vk: int) -> boolean   -- удерживается
+input.key_pressed(vk: int) -> boolean   -- нажата в этом кадре
+input.key_name(vk: int) -> string | nil
+input.cursor() -> x, y
+input.menu_open() -> boolean
+vk — виртуальные коды клавиш Windows (0x10 Shift, 0x11 Alt, 0x01 ЛКМ…). Разница key_down vs key_pressed — как «удерживаю» vs «только что нажал»: для одиночных действий (переключателей) используй key_pressed.
+
+переключатель оверлея на INSERT
+lua
+Копировать
+local show = true
+local VK_INSERT = 0x2D
+
+events.on("paint", function()
+    if input.key_pressed(VK_INSERT) then
+        show = not show
+        client.notify(show and "Оверлей включён" or "Оверлей выключен")
+    end
+    if show then
+        render.text(24, 200, color(255, 255, 255), "overlay on · INSERT to toggle")
+    end
+end)
+#
+game — состояние матча
+Функции матча
+game.map() -> string
+game.in_menu() / game.warmup() / game.freeze_time() -> boolean
+game.bomb_planted() / game.match_started() -> boolean
+game.rounds_played() -> integer
+game.round_time_left() -> number
+таймер раунда по центру
+lua
+Копировать
+events.on("paint", function()
+    if game.in_menu() or game.warmup() then return end
+
+    local left = game.round_time_left()
+    local m, s = math.floor(left / 60), math.round(left % 60)
+    local text = string.format("%d:%02d", m, s)
+    local w = render.screen_size()
+    local tw = render.text_size(text)
+    render.text(w / 2 - tw / 2, 24,
+        left < 15 and color("#ef6a5a") or color(255, 255, 255, 200), text)
+end)
+16
+client, user, log, config, binds, cvar, schema, panorama
+Сервисные модули: управление самим скриптом, уведомления, доступ к настройкам меню, биндам, консольным переменным и даже JS panorama.
+
+#
+client — сам скрипт
+client.delay(seconds, fn)
+client.delay(seconds: number, fn: function)
+Одноразовый таймер: fn выполнится через N секунд. Для периодики зови client.delay заново из самого колбэка.
+
+client.unload() / client.reload()
+client.unload()
+client.reload()
+Выгрузить скрипт из кода или перезагрузить его (удобно при разработке).
+
+client.name()
+client.name() -> string
+Имя файла скрипта.
+
+client.insecure()
+client.insecure() -> boolean
+Включён ли Allow Insecure — проверяй перед вызовом insecure-API, чтобы не падать с ошибкой.
+
+client.notify(text, title?)
+client.notify(text: string, title?: string)
+Всплывающее уведомление клиента (как системные нотификации меню).
+
+client.owner()
+client.owner() -> { name, uid, mine, since, loaded_by, loaded_uid }
+Кто владелец скрипта и кто его загрузил; mine — твой ли это скрипт.
+
+вежливый скрипт
+lua
+Копировать
+print("[" .. client.name() .. "] загружен, insecure = " .. tostring(client.insecure()))
+
+client.notify("Скрипт загружен", "My Script")
+
+-- периодическая задача раз в 5 секунд
+local function heartbeat()
+    -- ...проверка обновлений, статистика...
+    client.delay(5, heartbeat)
+end
+client.delay(5, heartbeat)
+
+events.on("unload", function()
+    client.notify("Скрипт выгружен", "My Script")
+end)
+#
+user — пользователь клиента
+user.*
+user.name() -> string
+user.uid() -> integer
+user.info() -> { name, uid }
+user.avatar(size?: int) -> wl.texture   -- 1..512
+#
+log — вывод
+log.chat(...) / log.console(...)
+log.chat(...)   -- в игровой чат; аргументы конкатенируются
+log.console(...)   -- в вывод Lua, с префиксом "[script] ", через tostring
+В отличие от print, log.console помечает строки префиксом скрипта, а log.chat пишет прямо в чат — видно всем, используй аккуратно.
+
+#
+config — настройки основного меню
+config.get(path)
+config.get(path: string) -> bool | int | number | string | {...}
+Значение настройки клиента по строковому пути (как ui.find, но строкой).
+
+config.set(path, value)
+config.set(path: string, value: bool | number | string | list) -> boolean
+Изменить настройку меню из скрипта; вернёт false, если путь не найден.
+
+config.keys(prefix?)
+config.keys(prefix?: string) -> { path, ... }
+Список всех доступных путей (можно отфильтровать префиксом) — незаменимо для разведки: for _, k in ipairs(config.keys("aim")) do print(k) end.
+
+#
+binds — скриптовые бинды
+binds.*
+binds.list() -> { {field, key, key_name, mode, value, number, active}, ... }
+binds.add(field: string, key: int, mode?: "hold" | "toggle" | "always", value?) -> true
+binds.remove(field: string, key?: int)
+binds.active(field: string, key?: int) -> boolean
+Бинды, созданные скриптом, появляются в общем списке биндов клиента. field — уникальный строковый id бинда.
+
+бинд на переключение режима
+lua
+Копировать
+binds.add("my_mode", 0x58, "toggle") -- X — переключатель
+
+events.on("paint", function()
+    render.text(24, 230, binds.active("my_mode") and color("#45d6b5") or color(255, 255, 255, 90),
+        "режим: " .. (binds.active("my_mode") and "ON" or "OFF"))
+end)
+
+events.on("unload", function()
+    binds.remove("my_mode")
+end)
+#
+cvar и schema
+cvar.find(name) → wl.cvar
+cvar.find(name: string) -> wl.cvar | nil
+-- wl.cvar: get_int, get_float, get_bool, set_int(v), set_float(v), set_bool(v), restore(), name()
+Прямой доступ к консольным переменным. restore() возвращает значение, которое было до изменения скриптом, — зови в unload.
+
+временно убрать руки с экрана
+lua
+Копировать
+local vm = cvar.find("viewmodel_offset_x")
+if vm then
+    local original = vm:get_float()
+    vm:set_float(2.5)
+    events.on("unload", function() vm:set_float(original) end)
+end
+schema.offset(class, field)
+schema.offset(class: string, field: string) -> integer
+Оффсет поля в сетевой схеме класса — для entity:get(offset, type) и memory.*.
+
+#
+panorama.run — JavaScript UI
+panorama.run(js, context?)
+panorama.run(js: string, context?: "hud" | "menu")
+Выполняет JS в panorama-контексте игры (HUD или главное меню) — можно дёргать штатные функции интерфейса вроде $.PlaySoundEvent или читать панели. Мощно, но хрупко: JS-имена меняются между патчами.
+
+17
+Утилиты — utils
+Мелочи, которых не хватает в голом Lua 5.1: кодировки, быстрые хеши, форматирование времени и буфер обмена.
+
+base64_encode / base64_decode
+utils.base64_encode(s: string) -> string
+utils.base64_decode(s: string) -> string
+Для упаковки бинарных данных в текст (например, перед записью в db или отправкой в http).
+
+fnv1a / murmur2
+utils.fnv1a(s: string) -> number
+utils.murmur2(s: string, seed?: number) -> number
+Быстрые некриптографические хеши — ключи для кэшей, сравнение строк, стабильные «случайные» значения по имени игрока:
+
+персональный цвет игрока по SteamID
+lua
+Копировать
+local function player_color(sid)
+    local h = utils.murmur2(sid or "?", 0xC0FFEE)
+    return color_hsv((h % 1000) / 1000, 0.55, 1)
+end
+time / date
+utils.time() -> number
+utils.date(fmt: string = "%Y-%m-%d %H:%M:%S", time?: number) -> string
+лог с временными метками
+lua
+Копировать
+local function logline(msg)
+    print("[" .. utils.date("%H:%M:%S") .. "] " .. msg)
+end
+clipboard_get / clipboard_set
+только insecure
+utils.clipboard_get() -> string
+utils.clipboard_set(s: string)
+Доступ к системному буферу обмена — например, скопировать конфиг одной кнопкой.
+
+18
+Insecure API
+Возможности, доступные только при включённом Allow Insecure на странице Lua: сырая память, файлы, сеть, хуки и LuaJIT FFI. Это мощный, но «громкий» режим — клиент в нём заметнее для античита.
+
+Прежде чем включать
+
+Проверяй режим через client.insecure() и деградируй gracefully: скрипт без insecure-части должен продолжать работать. Примеры из репозитория этот режим не используют.
+
+#
+memory — сырая память
+Функции памяти
+memory.read(type: string, address: number) -> value
+memory.write(type: string, address: number, value)
+memory.find_pattern(module: string, pattern: string) -> address | nil   -- "48 8B ? ?"
+memory.module(name: string) -> base, size
+memory.export(module: string, name: string) -> address
+memory.interface(module: string, name: string) -> address   -- через CreateInterface
+Типы те же, что у entity:get: int uint short byte int64 float double bool ptr vector handle string.
+
+чтение значения через паттерн и оффсет
+lua
+Копировать
+if client.insecure() then
+    local addr = memory.find_pattern("client.dll", "48 8B 05 ? ? ? ? 48 85 C0 74 ? 8B 88")
+    if addr then
+        -- rip-относительный адрес: 4 байта смещения сразу после паттерна
+        local rip = memory.read("int", addr + 3)
+        local target = addr + 7 + rip
+        print("адрес цели: " .. string.format("%X", target))
+    end
+
+    local base, size = memory.module("client.dll")
+    print(string.format("client.dll @ %X, %d KiB", base, size / 1024))
+end
+#
+file — файловая система
+Функции файлов
+file.read(name) -> string | nil, "cannot open"
+file.write(name, data) -> boolean
+file.append(name, data) -> boolean
+file.exists(name) -> boolean
+file.remove(name) -> boolean
+file.list(dir?) -> { name, ... }
+Корень — C:\neverwin\scripts\data; пути относительные и не могут выйти за его пределы.
+
+журнал событий матча
+lua
+Копировать
+if client.insecure() then
+    events.on("player_death", function(ev)
+        local line = string.format("[%s] %s
+", utils.date(), ev:name())
+        file.append("match_log.txt", line)
+    end)
+end
+#
+http — сеть
+http.get(url, opts?, callback)
+http.get(url: string, opts?, callback: function) -> true | false, "too many requests running"
+-- opts: { headers = { [k] = v }, timeout = seconds }
+-- callback(res), где res = { ok: bool, status: int, body: string, error: string, headers = { [k] = v } }
+Асинхронный GET: вызов возвращается сразу, ответ приходит в колбэк.
+
+http.post(url, body, opts?, callback)
+http.post(url: string, body: string, opts?, callback: function) -> true | false, "too many requests running"
+POST с телом (обычно json.encode(...)) и заголовками в opts.headers.
+
+отправить статистику на свой сервер
+lua
+Копировать
+if client.insecure() then
+    local function push_stats()
+        local body = json.encode({
+            user = user.uid(),
+            map = game.map(),
+            stats = db.load("my_stats", {}),
+        })
+
+        local ok, err = http.post("https://api.example.com/stats", body, {
+            headers = { ["Content-Type"] = "application/json" },
+            timeout = 5,
+        }, function(res)
+            if res.ok then
+                log.console("статистика отправлена, ответ " .. res.status)
+            else
+                log.console("ошибка сети: " .. tostring(res.error))
+            end
+        end)
+
+        if not ok then log.console(err) end -- лимит одновременных запросов
+    end
+
+    events.on("level_shutdown", push_stats)
+end
+#
+hooks — перехват функций (до 64)
+hooks.add(target, ctype, fn) / hooks.add(target, address)
+hook, original = hooks.add(target, ctype: string, fn: function)
+hook = hooks.add(target, callback_address: number)
+-- target/callback: число или cdata; Lua-обёртка делает ffi.cast(ctype, fn)
+-- и сохраняет колбэк от сборщика мусора
+Первая форма перехватывает функцию по адресу и даёт тебе Lua-колбэк плюс original — вызов оригинала. Вторая — низкоуровневая, для уже скомпилированных колбэков.
+
+hooks.remove(hook) / hooks.list()
+hooks.remove(hook) -> boolean
+hooks.list() -> { wl.hook, ... }
+-- wl.hook: original(), target(), active(), remove()
+Снятие хука обязательно в unload — повисший перехват крашит игру.
+
+#
+ffi — LuaJIT FFI
+ffi
+ffi   -- стандартный модуль LuaJIT FFI
+Полный FFI: ffi.cdef, ffi.cast, вызовы WinAPI и функций движка по адресу. Работает только в insecure-режиме; именно на нём построена обёртка hooks.add (см. встроенный код в приложении).
+
+19
+Приложения — адреса и встроенный код
+Справочные данные из исходной спецификации: адреса LuaJIT C API в бинарнике и Lua-код, который клиент выполняет сам до старта скрипта.
+
+Важно
+
+Адресы относятся к исходному бинарнику спецификации. Это материал для исследования и реверса, а не стабильные адреса текущих сборок — в новых билдах они съезжают.
+
+#
+Приложение A · Адреса LuaJIT C API
+Функция	Адрес
+lua_setfield	0x18047F8E0
+lua_getfield	0x18047EB70
+lua_pushcclosure	0x18047F2B0
+lua_createtable	0x18047E8F0
+luaL_newmetatable	0x18047E380
+lua_setmetatable	0x18047F990
+lua_settop	0x18047FB50
+lua_pushvalue	0x18047F610
+lua_pushnumber	0x18047F4F0
+lua_pushinteger	0x18047F3D0
+lua_pushboolean	0x18047F270
+lua_pushstring	0x18047F530
+lua_pushlstring	0x18047F450
+lua_pushnil	0x18047F4D0
+lua_newuserdata	0x18047EFB0
+lua_touserdata	0x18047FD90
+luaL_checkudata	0x18047E2C0
+luaL_testudata	0x18047E680
+luaL_checklstring	0x18047E090
+luaL_optlstring	0x18047E510
+luaL_checknumber	0x18047E140
+luaL_optnumber	0x18047E5F0
+luaL_checkinteger	0x18047E010
+luaL_optinteger	0x18047E470
+luaL_checktype	0x18047E240
+lua_type	0x18047FE10
+luaL_error	0x180484C10
+luaL_ref / luaL_unref	0x1804851B0 / 0x180485280
+lua_pcall	0x18047F190
+luaL_loadstring	0x180482E70
+Хелпер скриптового движка	Адрес
+check_color	0x180063EB0
+check_vector	0x180063D70
+check_ui	0x180053900
+push_ui	0x1800540B0
+ui_create	0x180053B10
+регистратор API	0x1800641B0
+песочница	0x18006EE50
+загрузчик скрипта	0x180070B90
+#
+Приложение B · Встроенный Lua-код
+Клиент выполняет три куска Lua ещё до твоего скрипта: прелюдию с vector/color/math/json, обёртку db и обёртку hooks.add. Полные тексты — в reference.md; ниже — самое поучительное.
+
+B.2 · как устроен db
+обёртка db (в оригинале — одной строкой)
+lua
+Копировать
+local read, write = db._read, db._write
+db._read, db._write = nil, nil   -- спрятать сырые функции от скриптов
+
+function db.save(name, value)
+    return write(name, json.encode(value))
+end
+
+function db.load(name, default)
+    local text = read(name)
+    if not text then return default end
+    local value = json.decode(text)
+    if value == nil then return default end
+    return value
+end
+Обрати внимание: сырые db._read/db._write обнуляются после инициализации — наружу торчит только безопасная пара save/load.
+
+B.3 · обёртка hooks.add
+Lua-обёртка перехвата
+lua
+Копировать
+local raw = hooks.add
+local keep = {}
+
+hooks.add = function(target, a, b)
+    if type(a) ~= 'string' then
+        return raw(target, a)           -- низкоуровневая форма
+    end
+    local callback = ffi.cast(a, b)     -- ctype → C-колбэк
+    local hook = raw(target, callback)
+    keep[hook] = callback               -- не дать GC убить колбэк
+    return hook, ffi.cast(a, hook:original())
+end
+Таблица keep решает классическую проблему FFI: если не держать ссылку на ffi.cast-колбэк, сборщик мусора освободит его — и игра упадёт при первом же вызове хука.
+
+B.1 · прелюдия vector / color / math / json
+Полный исходник (~250 строк чистой Lua 5.1) лежит в спецификации. Несколько выводов, которые из него следуют:
+
+векторы и цвета — обычные таблицы с метатаблицами, поэтому свои «цвета» можно собирать руками: setmetatable({r=255,g=0,b=0,a=255}, {}) тоже сработает в render.*;
+операторы векторов принимают и число, и вектор: vector(1,2,3) * 2 и vector(1,2,3) * vector(4,5,6) — оба валидны;
+в json.encode массивом считается таблица с подряд идущими числовыми ключами; смешанные таблицы сериализуются как объекты;
+NaN и ±inf в JSON превращаются в null — не теряй их молча.
+20
+Ошибки и FAQ
+Сообщения, которые скрипт может бросить, — с причинами и лечением. Если своей ошибки здесь нет, открой Issue с минимальным примером и номером сборки.
+
+#
+Расшифровка ошибок
+render.* draws only inside a paint callback
+
+Почему: Функция рисования вызвана вне события paint — например, прямо в теле скрипта или в createmove.
+
+Что делать: Перенеси вызов внутрь events.on("paint", ...). Тяжёлые расчёты оставь в createmove, в paint — только рисование.
+
+bad argument #N (a color is needed: color(r, g, b, a))
+
+Почему: В render.* передано число, строка или nil вместо цвета — часто из-за перепутанного порядка аргументов.
+
+Что делать: Проверь сигнатуру: цвет всегда идёт после координат. Собери color(...) заранее в переменную и проинспектируй её print'ом.
+
+schema: no field <class>::<field>
+
+Почему: Поля с таким именем нет в сетевой схеме этого класса — опечатка или поле живёт в родительском/другом классе.
+
+Что делать: Проверь имя класса (entity:class_name()) и имя поля. Для разведки путей настроек есть config.keys(prefix).
+
+script does not own this element
+
+Почему: Ты вызвал метод изменения (set_name, import, chip…) на элементе основного меню, найденном через ui.find.
+
+Что делать: Эти методы работают только на элементах, созданных скриптом (ui.checkbox и т.п.). Родные элементы — только чтение и set_value.
+
+option is not a color picker / chips can only be added to entity elements
+
+Почему: Метод применён к элементу неподходящего типа.
+
+Что делать: Проверь тип через wl.menu_control:get_type() перед вызовом.
+
+too many requests running
+
+Почему: Превышен лимит одновременных http-запросов скрипта.
+
+Что делать: Дождись колбэка предыдущего запроса или ставь запросы в очередь через client.delay.
+
+no such icon
+
+Почему: Имени иконки нет во встроенном наборе.
+
+Что делать: Список всех имён — render.icons().
+
+cannot open (file.read)
+
+Почему: Файл не найден. Пути file.* считаются от C:\neverwin\scripts\data.
+
+Что делать: Проверь file.exists() и регистр имени; абсолютные пути не поддерживаются.
+
+json.decode: trailing characters at N
+
+Почему: После валидного JSON в строке есть мусор — например, два объекта подряд или BOM.
+
+Что делать: Пиши в файл только результат json.encode и читай целиком.
+
+Скрипт не появляется / не загружается
+
+Почему: Кодировка не UTF-8, файл больше 256 КиБ, синтаксическая ошибка или выключен нужный режим.
+
+Что делать: Сохрани как UTF-8 без BOM, смотри текст ошибки в выводе Lua. Для ffi/memory/http/file включи Allow Insecure.
+
+#
+Частые вопросы
+Вопрос	Ответ
+Куда класть скрипты?	В C:\neverwin\scripts (или создать через Extensions → +). Ресурсы — в подпапках images / fonts / particles / data.
+Чем db отличается от file?	db — именованные JSON-значения «из коробки», file — произвольные файлы (и требует insecure).
+Как перезагрузить скрипт при разработке?	Кнопка Reload в Extensions или client.reload() из самого скрипта.
+Почему render.* нельзя в createmove?	Кадр ещё не строится — рисовать физически некуда. Посчитай данные в createmove, нарисуй в paint.
+Что такое wl.* в сигнатурах?	Внутренние имена типов объектов (wl.entity, wl.ui, wl.cmd…). В коде ты их не пишешь — просто получаешь из функций.
+Сколько всего можно создать?	До 64 вкладок на скрипт, до 64 хуков, до 256 текстур. Лимит одновременных http-запросов — небольшой, ставь очередь.
+Можно ли писать на Lua 5.3/5.4?	Нет — рантайм LuaJIT 2.1 совместим с Lua 5.1: нет целочисленного деления //, битовых операторов & | ~ и goto-меток в стиле 5.2+. Биты — через библиотеку bit.
+Как сообщить о неточности в справочнике?	Issue на GitHub: минимальный пример, версия сборки, текст ошибки, ожидаемый результат.
+Чек-лист здорового скрипта
+
+1) всё рисование — в paint; 2) трассировки — в createmove; 3) wl.cmd/wl.view/wl.event не покидают своих колбэков; 4) текстуры и шрифты загружаются один раз; 5) в unload снимаются esp-элементы, бинды, хуки и восстановленные cvar; 6) client.insecure() проверяется до insecure-вызовов.
+
+NEVERLOSE LUA API
+Документация собрана по материалам репозитория PbLJk/neverlose-lua-api. Основа справочника — восстановленная спецификация Lua API сборки; совместимость методов с новыми сборками может отличаться.
+
+Репозиторий
+
+Исходный код
+Сообщить о проблеме
+Примеры скриптов
+Документация
+
+Быстрый старт
+Справочник API
+Ошибки и FAQ
+C:\neverwin\scripts · LuaJIT 2.1 · CS2 · 2026
